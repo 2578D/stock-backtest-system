@@ -207,8 +207,8 @@ const groupedOptions = (() => {
 <style scoped>
 .editor h2 { margin-bottom: 16px; }
 .card-hd { display: flex; justify-content: space-between; align-items: center; }
-.cond-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; padding: 8px 10px; background: #fafafa; border-radius: 6px; flex-wrap: wrap; }
+.cond-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; padding: 8px 10px; background: #fafafa; border-radius: 6px; }
 .param-label { font-size: 11px; color: #909399; margin: 0 2px 0 4px; }
-.expr { font-size: 12px; color: #409eff; font-family: monospace; margin-left: 8px; min-width: 120px; }
+.expr { font-size: 12px; color: #409eff; font-family: monospace; margin-left: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
 .empty { color: #c0c4cc; text-align: center; padding: 20px; }
 </style>
