@@ -12,7 +12,7 @@ async function loadStrategies() {
   loading.value = true;
   try {
     const res = await strategyApi.list();
-    strategies.value = res.data || [];
+    strategies.value = res.data.data || [];
   } catch (e) {
     ElMessage.error("加载策略失败");
   } finally {
