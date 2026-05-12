@@ -40,9 +40,9 @@ function fmtNum(v: number | null | undefined) {
   if (v == null) return "-";
   return v.toFixed(2);
 }
-function statusTag(s: string) {
-  const map: Record<string, string> = { pending: "info", running: "warning", completed: "success", failed: "danger" };
-  return map[s] || "info";
+function statusTag(s: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
+  const map = { pending: 'info' as const, running: 'warning' as const, completed: 'success' as const, failed: 'danger' as const };
+  return map[s] || 'info';
 }
 function statusLabel(s: string) {
   const map: Record<string, string> = { pending: "等待中", running: "运行中", completed: "已完成", failed: "失败" };
