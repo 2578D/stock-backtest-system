@@ -23,6 +23,7 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  base: '/stock/',
   server: {
     port: 5173,
     proxy: {

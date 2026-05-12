@@ -4,7 +4,7 @@ import { ElMessage } from "element-plus";
 import router from "@/router";
 
 const http: AxiosInstance = axios.create({
-  baseURL: "/api/v1",
+  baseURL: "/stock/api/v1",
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
