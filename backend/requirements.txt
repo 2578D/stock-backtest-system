@@ -1,0 +1,43 @@
+# Core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# PostgreSQL extension
+# TimescaleDB: installed via extension in PostgreSQL, no Python package needed
+
+# Redis & Celery
+redis==5.2.1
+celery[redis]==5.4.0
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.18
+
+# Data
+pandas==2.2.3
+numpy==1.26.4
+pyarrow==18.1.0
+
+# HTTP
+httpx==0.28.1
+aiohttp==3.11.10
+
+# Data sources
+efinance>=0.5.8
+
+# WebSocket
+websockets==14.1
+
+# Utils
+python-dotenv==1.0.1
+structlog==24.4.0
+tenacity==9.0.0
