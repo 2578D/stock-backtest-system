@@ -24,15 +24,35 @@ jobs:
         run: npm ci && npm run build
 
       # ── 部署到生产服务器 ──
-      - name: Deploy Source
+      - name: Deploy Backend Source
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "backend,docker,sync_tickflow.py,frontend/dist"
+          source: backend/**
           target: /opt/stock-backtest-src
           strip_components: 0
+
+      - name: Deploy Docker Config
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: docker/**
+          target: /opt/stock-backtest-src
+          strip_components: 0
+
+      - name: Deploy Frontend Dist
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: frontend/dist/**
+          target: /opt/stock-backtest-src
+          strip_components: 1
 
       - name: Restart Services
         uses: appleboy/ssh-action@v1.0.3
@@ -41,13 +61,14 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Sync to deployment dir
-            rsync -a --delete /opt/stock-backtest-src/ /opt/stock-backtest/
+            cd /opt/stock-backtest-src
+            # Copy files into deployment dir (preserve existing docker-compose.yml and .env)
+            sudo cp -r backend /opt/stock-backtest/ 2>/dev/null || true
+            sudo cp -r docker /opt/stock-backtest/ 2>/dev/null || true
+            sudo cp -r frontend/dist /opt/stock-backtest/frontend/ 2>/dev/null || true
 
             # Rebuild and restart
             cd /opt/stock-backtest
             sudo docker compose up -d --build
             sudo docker exec stock-backtest-nginx-1 nginx -s reload 2>/dev/null || true
-
-            # Clean old images
             sudo docker image prune -f 2>/dev/null || true
