@@ -79,7 +79,7 @@ onMounted(loadStrategies);
       <el-table-column prop="updated_at" label="更新" width="180">
         <template #default="{ row }">{{ row.updated_at?.slice(0, 10) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="250" fixed="right" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="goEdit(row.id)">编辑</el-button>
           <el-button size="small" type="primary" @click="goBacktest(row.id)">回测</el-button>
