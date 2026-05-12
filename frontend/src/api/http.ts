@@ -25,7 +25,6 @@ http.interceptors.request.use(
 http.interceptors.response.use(
   (response: AxiosResponse) => {
     const data = response.data;
-    // Only check code for wrapped responses (skip auth endpoints that return TokenResponse directly)
     if (data.code !== undefined && data.code !== 0) {
       ElMessage.error(data.message || "请求失败");
       return Promise.reject(new Error(data.message));

@@ -17,8 +17,7 @@ export const useUserStore = defineStore("user", () => {
 
   async function login(username: string, password: string) {
     const res = await authApi.login({ username, password });
-    // Auth endpoints return TokenResponse directly, not {code, data} wrapped
-    const data = res.data;
+    const data = res.data.data;
     token.value = data.access_token;
     refreshToken.value = data.refresh_token;
     localStorage.setItem("access_token", data.access_token);
@@ -28,7 +27,7 @@ export const useUserStore = defineStore("user", () => {
 
   async function register(email: string, username: string, password: string) {
     const res = await authApi.register({ email, username, password });
-    const data = res.data;
+    const data = res.data.data;
     token.value = data.access_token;
     refreshToken.value = data.refresh_token;
     localStorage.setItem("access_token", data.access_token);

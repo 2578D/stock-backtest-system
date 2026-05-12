@@ -43,10 +43,9 @@ class TokenResponse(BaseModel):
 
 # ── Endpoints ───────────────────────────────────
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register")
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """Register a new user."""
-    # Check existing
     existing = await db.execute(
         select(User).where(
             (User.email == req.email) | (User.username == req.username)
@@ -70,13 +69,17 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     access_token = create_access_token(payload)
     refresh_token = create_refresh_token(payload)
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return {
+        "code": 0,
+        "data": {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+        },
+    }
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Login and get tokens."""
     result = await db.execute(
@@ -93,13 +96,17 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     access_token = create_access_token(payload)
     refresh_token = create_refresh_token(payload)
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return {
+        "code": 0,
+        "data": {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+        },
+    }
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh")
 async def refresh(req: RefreshRequest):
     """Refresh access token."""
     payload = decode_token(req.refresh_token)
@@ -115,10 +122,14 @@ async def refresh(req: RefreshRequest):
     access_token = create_access_token(new_payload)
     refresh_token = create_refresh_token(new_payload)
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return {
+        "code": 0,
+        "data": {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+        },
+    }
 
 
 @router.get("/me")
