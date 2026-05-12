@@ -161,17 +161,17 @@ async function saveAndBacktest() {
           </el-form>
         </el-card>
         <el-card header="模板" style="margin-top: 12px">
-          <el-button v-for="(t, k) in templates" :key="k" style="width: 100%; margin-bottom: 6px" size="small" @click="loadTemplate(k)">
-            {{ t.name }}
-          </el-button>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <el-button v-for="(t, k) in templates" :key="k" size="small" @click="loadTemplate(k)">
+              {{ t.name }}
+            </el-button>
+          </div>
         </el-card>
         <el-card header="操作" style="margin-top: 12px">
-          <el-button type="primary" style="width: 100%; margin-bottom: 8px" @click="save" :loading="saving">
-            保存策略
-          </el-button>
-          <el-button type="success" style="width: 100%" @click="saveAndBacktest" :loading="saving">
-            保存并回测
-          </el-button>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <el-button type="primary" @click="save" :loading="saving">保存策略</el-button>
+            <el-button type="success" @click="saveAndBacktest" :loading="saving">保存并回测</el-button>
+          </div>
         </el-card>
       </el-col>
     </el-row>

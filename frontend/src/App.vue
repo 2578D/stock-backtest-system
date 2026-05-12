@@ -19,19 +19,11 @@ body,
     sans-serif;
 }
 
-/* Global table alignment */
+/* Consistent table row height and vertical centering */
+.el-table td.el-table__cell {
+  vertical-align: middle;
+}
 .el-table .cell {
-  display: flex;
-  align-items: center;
-  word-break: keep-all;
-  white-space: nowrap;
-}
-.el-table th .cell {
-  white-space: nowrap;
-}
-/* Allow text columns to wrap if needed */
-.el-table .cell-wrap .cell {
-  white-space: normal;
-  word-break: break-word;
+  line-height: 1.4;
 }
 </style>
