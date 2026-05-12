@@ -8,7 +8,6 @@ const router = useRouter();
 
 const strategyName = ref("");
 const description = ref("");
-const codeContent = ref(MA_TEMPLATE);
 const saving = ref(false);
 
 const MA_TEMPLATE = `# 双均线金叉策略
@@ -39,6 +38,8 @@ class MACrossStrategy(IStrategy):
             if pos and pos.quantity > 0:
                 orders.append(Order(sym, 'sell', pos.quantity, reason='MA死叉'))
         return orders`;
+
+const codeContent = ref(MA_TEMPLATE);
 
 const templates: Record<string, { name: string; code: string }> = {
   ma: { name: "均线金叉", code: MA_TEMPLATE },

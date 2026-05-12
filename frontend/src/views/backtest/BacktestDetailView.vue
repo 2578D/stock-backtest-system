@@ -76,31 +76,31 @@ onMounted(load);
       <el-tab-pane label="收益概览" name="overview">
         <el-row :gutter="16">
           <el-col :span="6">
-            <el-card><el-statistic title="总收益率" :value="fmtPct(result.total_return)" /></el-card>
+            <el-card><el-statistic title="总收益率"><template #default>{{ fmtPct(result.total_return) }}</template></el-statistic></el-card>
           </el-col>
           <el-col :span="6">
-            <el-card><el-statistic title="年化收益率" :value="fmtPct(result.annual_return)" /></el-card>
+            <el-card><el-statistic title="年化收益率"><template #default>{{ fmtPct(result.annual_return) }}</template></el-statistic></el-card>
           </el-col>
           <el-col :span="6">
-            <el-card><el-statistic title="最大回撤" :value="fmtPct(result.max_drawdown)" /></el-card>
+            <el-card><el-statistic title="最大回撤"><template #default>{{ fmtPct(result.max_drawdown) }}</template></el-statistic></el-card>
           </el-col>
           <el-col :span="6">
-            <el-card><el-statistic title="夏普比率" :value="fmtNum(result.sharpe_ratio)" /></el-card>
+            <el-card><el-statistic title="夏普比率"><template #default>{{ fmtNum(result.sharpe_ratio) }}</template></el-statistic></el-card>
           </el-col>
         </el-row>
 
         <el-row :gutter="16" style="margin-top: 16px">
           <el-col :span="6">
-            <el-card><el-statistic title="胜率" :value="fmtPct(result.win_rate)" /></el-card>
+            <el-card><el-statistic title="胜率"><template #default>{{ fmtPct(result.win_rate) }}</template></el-statistic></el-card>
           </el-col>
           <el-col :span="6">
-            <el-card><el-statistic title="盈亏比" :value="fmtNum(result.profit_loss_ratio)" /></el-card>
+            <el-card><el-statistic title="盈亏比"><template #default>{{ fmtNum(result.profit_loss_ratio) }}</template></el-statistic></el-card>
           </el-col>
           <el-col :span="6">
-            <el-card><el-statistic title="交易次数" :value="result.trade_count ?? '-'" /></el-card>
+            <el-card><el-statistic title="交易次数"><template #default>{{ result.trade_count ?? '-' }}</template></el-statistic></el-card>
           </el-col>
           <el-col :span="6">
-            <el-card><el-statistic title="超额收益" :value="fmtPct(result.excess_return)" /></el-card>
+            <el-card><el-statistic title="超额收益"><template #default>{{ fmtPct(result.excess_return) }}</template></el-statistic></el-card>
           </el-col>
         </el-row>
       </el-tab-pane>
