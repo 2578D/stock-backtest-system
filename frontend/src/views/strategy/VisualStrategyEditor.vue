@@ -145,7 +145,7 @@ const groupedOptions = (() => {
               <el-input v-model="c.threshold" size="small" style="width: 80px" />
             </template>
             <span class="expr">{{ exprPreview(c) }}</span>
-            <el-button size="small" type="danger" circle @click="removeBuy(i)">−</el-button>
+            <el-button size="small" type="danger" circle @click="removeBuy(i)" style="margin-left: auto; flex-shrink: 0;">−</el-button>
           </div>
         </el-card>
 
@@ -175,7 +175,7 @@ const groupedOptions = (() => {
               <el-input v-model="c.threshold" size="small" style="width: 80px" />
             </template>
             <span class="expr">{{ exprPreview(c) }}</span>
-            <el-button size="small" type="danger" circle @click="removeSell(i)">−</el-button>
+            <el-button size="small" type="danger" circle @click="removeSell(i)" style="margin-left: auto; flex-shrink: 0;">−</el-button>
           </div>
         </el-card>
 
