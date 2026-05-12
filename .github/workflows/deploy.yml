@@ -1,0 +1,53 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 前端构建 ──
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+
+      # ── 部署到生产服务器 ──
+      - name: Deploy Source
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "backend,docker,sync_tickflow.py,frontend/dist"
+          target: /opt/stock-backtest-src
+          strip_components: 0
+
+      - name: Restart Services
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Sync to deployment dir
+            rsync -a --delete /opt/stock-backtest-src/ /opt/stock-backtest/
+
+            # Rebuild and restart
+            cd /opt/stock-backtest
+            sudo docker compose up -d --build
+            sudo docker exec stock-backtest-nginx-1 nginx -s reload 2>/dev/null || true
+
+            # Clean old images
+            sudo docker image prune -f 2>/dev/null || true
