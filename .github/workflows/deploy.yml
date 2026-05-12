@@ -11,7 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── 前端构建 ──
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -23,16 +22,16 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
 
-      # ── 部署到生产服务器 ──
-      - name: Deploy Backend Source
+      - name: Deploy Backend
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: backend/**
-          target: /opt/stock-backtest-src
+          source: backend
+          target: /tmp/deploy-stock
           strip_components: 0
+          rm: true
 
       - name: Deploy Docker Config
         uses: appleboy/scp-action@v0.1.7
@@ -40,19 +39,21 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: docker/**
-          target: /opt/stock-backtest-src
+          source: docker
+          target: /tmp/deploy-stock
           strip_components: 0
+          rm: false
 
-      - name: Deploy Frontend Dist
+      - name: Deploy Frontend
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: frontend/dist/**
-          target: /opt/stock-backtest-src
-          strip_components: 1
+          source: frontend/dist
+          target: /tmp/deploy-stock
+          strip_components: 0
+          rm: false
 
       - name: Restart Services
         uses: appleboy/ssh-action@v1.0.3
@@ -61,14 +62,12 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /opt/stock-backtest-src
-            # Copy files into deployment dir (preserve existing docker-compose.yml and .env)
-            sudo cp -r backend /opt/stock-backtest/ 2>/dev/null || true
-            sudo cp -r docker /opt/stock-backtest/ 2>/dev/null || true
-            sudo cp -r frontend/dist /opt/stock-backtest/frontend/ 2>/dev/null || true
+            sudo cp -r /tmp/deploy-stock/backend/* /opt/stock-backtest/backend/
+            sudo cp -r /tmp/deploy-stock/docker/* /opt/stock-backtest/docker/
+            sudo cp -r /tmp/deploy-stock/frontend/dist/* /opt/stock-backtest/frontend/dist/
 
-            # Rebuild and restart
             cd /opt/stock-backtest
-            sudo docker compose up -d --build
-            sudo docker exec stock-backtest-nginx-1 nginx -s reload 2>/dev/null || true
-            sudo docker image prune -f 2>/dev/null || true
+            sudo docker compose up -d --build 2>&1
+            sudo docker exec stock-backtest-nginx-1 nginx -s reload
+            sudo docker image prune -f
+          command_timeout: 30m
