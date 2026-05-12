@@ -41,8 +41,8 @@ function fmtNum(v: number | null | undefined) {
   return v.toFixed(2);
 }
 function statusTag(s: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
-  const map = { pending: 'info' as const, running: 'warning' as const, completed: 'success' as const, failed: 'danger' as const };
-  return map[s] || 'info';
+  const map: Record<string, 'info' | 'warning' | 'success' | 'danger'> = { pending: 'info', running: 'warning', completed: 'success', failed: 'danger' };
+  return (map[s] as 'info' | 'warning' | 'success' | 'danger') || 'info';
 }
 function statusLabel(s: string) {
   const map: Record<string, string> = { pending: "等待中", running: "运行中", completed: "已完成", failed: "失败" };
