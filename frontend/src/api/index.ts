@@ -69,6 +69,12 @@ export const backtestApi = {
   },
 };
 
+export const dashboardApi = {
+  getStats() {
+    return http.get("/dashboard/stats");
+  },
+};
+
 export const systemApi = {
   getProfile() {
     return http.get("/system/profile");
