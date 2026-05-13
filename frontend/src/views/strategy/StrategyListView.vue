@@ -79,11 +79,13 @@ onMounted(loadStrategies);
       <el-table-column prop="updated_at" label="更新" width="180">
         <template #default="{ row }">{{ row.updated_at?.slice(0, 10) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right" align="center">
+      <el-table-column label="操作" width="250" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="goEdit(row.id)">编辑</el-button>
-          <el-button size="small" type="primary" @click="goBacktest(row.id)">回测</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(row.id, row.name)">删除</el-button>
+          <div class="action-btns">
+            <el-button size="small" @click="goEdit(row.id)">编辑</el-button>
+            <el-button size="small" type="primary" @click="goBacktest(row.id)">回测</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row.id, row.name)">删除</el-button>
+          </div>
         </template>
       </el-table-column>
       <template #empty>
@@ -105,5 +107,11 @@ onMounted(loadStrategies);
 .actions {
   display: flex;
   gap: 8px;
+}
+.action-btns {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 </style>
