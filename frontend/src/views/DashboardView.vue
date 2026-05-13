@@ -67,7 +67,7 @@ onMounted(async () => {
     <h2>仪表盘</h2>
 
     <!-- 核心指标卡片 -->
-    <el-row :gutter="16">
+    <el-row :gutter="16" class="metric-row">
       <el-col :xs="12" :sm="6">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon" style="background: #e6f4ff">
@@ -197,6 +197,10 @@ onMounted(async () => {
 <style scoped>
 .dashboard h2 {
   margin-bottom: 16px;
+}
+
+.metric-row :deep(.el-col) {
+  margin-bottom: 12px;
 }
 
 .stat-card {

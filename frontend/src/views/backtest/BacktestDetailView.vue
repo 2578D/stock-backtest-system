@@ -74,7 +74,7 @@ onMounted(load);
     <el-tabs v-model="activeTab" style="margin-top: 16px">
       <!-- Overview -->
       <el-tab-pane label="收益概览" name="overview">
-        <el-row :gutter="16">
+        <el-row :gutter="16" class="metric-row">
           <el-col :span="6">
             <el-card><el-statistic title="总收益率"><template #default>{{ fmtPct(result.total_return) }}</template></el-statistic></el-card>
           </el-col>
@@ -89,7 +89,7 @@ onMounted(load);
           </el-col>
         </el-row>
 
-        <el-row :gutter="16" style="margin-top: 16px">
+        <el-row :gutter="16" style="margin-top: 16px" class="metric-row">
           <el-col :span="6">
             <el-card><el-statistic title="胜率"><template #default>{{ fmtPct(result.win_rate) }}</template></el-statistic></el-card>
           </el-col>
@@ -154,5 +154,8 @@ onMounted(load);
 .top-bar {
   display: flex;
   align-items: center;
+}
+.metric-row :deep(.el-col) {
+  margin-bottom: 12px;
 }
 </style>
