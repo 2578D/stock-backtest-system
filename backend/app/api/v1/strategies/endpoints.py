@@ -1,5 +1,6 @@
 """Strategy endpoints — CRUD and version management."""
 
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -86,11 +87,11 @@ async def create_strategy(
             "name": req.name,
             "desc": req.description,
             "type": req.type,
-            "rules": str(req.rules_json).replace("'", '"') if req.rules_json else "{}",
+            "rules": json.dumps(req.rules_json) if req.rules_json else "{}",
             "code": req.code_content,
             "market": req.market,
             "period": req.period,
-            "risk": str(req.risk_control).replace("'", '"') if req.risk_control else "{}",
+            "risk": json.dumps(req.risk_control) if req.risk_control else "{}",
             "shared": req.is_shared,
         },
     )
@@ -152,13 +153,13 @@ async def update_strategy(
         params["desc"] = req.description
     if req.rules_json is not None:
         sets.append("rules_json = CAST(:rules AS JSONB)")
-        params["rules"] = str(req.rules_json).replace("'", '"')
+        params["rules"] = json.dumps(req.rules_json)
     if req.code_content is not None:
         sets.append("code_content = :code")
         params["code"] = req.code_content
     if req.risk_control is not None:
         sets.append("risk_control = CAST(:risk AS JSONB)")
-        params["risk"] = str(req.risk_control).replace("'", '"')
+        params["risk"] = json.dumps(req.risk_control)
     if req.is_shared is not None:
         sets.append("is_shared = :shared")
         params["shared"] = req.is_shared

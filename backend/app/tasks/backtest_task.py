@@ -12,6 +12,7 @@ from app.celery_app import celery_app
 from app.core.config import get_settings
 from app.engine.backtest import BacktestConfig, BacktestEngine
 from app.engine.strategy import IStrategy
+from app.engine.visual_strategy import VisualStrategy, parse_visual_rules, VisualStrategyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,10 @@ def run_backtest(self, task_id: str, strategy_code: str = "") -> dict:
             if strat_row[0] == "code" and strat_row[2]:
                 strategy = _build_code_strategy(strat_row[2])
             else:
-                # Visual strategy — use a simple pass-through
-                strategy = _SimpleStrategy()
+                # Visual strategy — compile rules into VisualStrategy
+                rules = strat_row[1] if strat_row[1] else {}
+                config = parse_visual_rules(rules)
+                strategy = VisualStrategy(config)
         else:
             strategy = _SimpleStrategy()
 

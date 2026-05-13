@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { strategyApi, backtestApi } from "@/api";
+import { strategyApi, backtestApi, dataApi } from "@/api";
 import { ElMessage } from "element-plus";
+import { Plus, Close } from "@element-plus/icons-vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -17,8 +18,67 @@ const form = ref({
   positionMode: "fixed",
   benchmark: "000300.SH",
   adjustMode: "forward",
-  stockPool: {} as Record<string, any>,
 });
+
+// Stock pool management
+const stockCodes = ref<string[]>([]);
+const stockInput = ref("");
+const stockSuggestions = ref<{ code: string; name: string }[]>([]);
+const stockSearching = ref(false);
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onStockInput(val: string) {
+  if (searchTimer) clearTimeout(searchTimer);
+  if (!val.trim()) {
+    stockSuggestions.value = [];
+    return;
+  }
+  searchTimer = setTimeout(async () => {
+    stockSearching.value = true;
+    try {
+      const res = await dataApi.listStocks({ keyword: val, page_size: 10 });
+      const list = res.data?.data || [];
+      stockSuggestions.value = list.map((s: any) => ({ code: s.code, name: s.name }));
+    } catch { /* ignore */ }
+    finally { stockSearching.value = false; }
+  }, 300);
+}
+
+// Wrapper for el-autocomplete fetch-suggestions callback
+function fetchSuggestions(q: string, cb: (items: { value: string; code: string }[]) => void) {
+  onStockInput(q);
+  // Wait for debounce then resolve
+  setTimeout(() => {
+    cb(stockSuggestions.value.map(s => ({ value: `${s.code} ${s.name}`, code: s.code })));
+  }, 350);
+}
+
+function addStock(code: string) {
+  const clean = code.trim().toUpperCase();
+  if (clean && !stockCodes.value.includes(clean)) {
+    stockCodes.value.push(clean);
+  }
+  stockInput.value = "";
+  stockSuggestions.value = [];
+}
+
+function removeStock(code: string) {
+  stockCodes.value = stockCodes.value.filter(c => c !== code);
+}
+
+// Batch add from comma/newline separated input
+function batchAdd() {
+  const codes = stockInput.value
+    .split(/[\n,，]+/)
+    .map(c => c.trim())
+    .filter(Boolean);
+  for (const c of codes) {
+    if (!stockCodes.value.includes(c)) {
+      stockCodes.value.push(c);
+    }
+  }
+  stockInput.value = "";
+}
 
 const strategies = ref<{ id: string; name: string }[]>([]);
 
@@ -44,6 +104,10 @@ async function submit() {
     ElMessage.warning("请选择日期范围");
     return;
   }
+  if (!stockCodes.value.length) {
+    ElMessage.warning("请添加至少一只股票代码");
+    return;
+  }
 
   submitting.value = true;
   try {
@@ -56,7 +120,7 @@ async function submit() {
       position_mode: form.value.positionMode,
       benchmark: form.value.benchmark,
       adjust_mode: form.value.adjustMode,
-      stock_pool: form.value.stockPool,
+      stock_pool: { symbols: stockCodes.value },
       cost_config: {},
     };
     const res = await backtestApi.create(payload);
@@ -81,6 +145,43 @@ async function submit() {
           <el-select v-model="form.strategyId" placeholder="请选择策略" style="width: 100%">
             <el-option v-for="s in strategies" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
+        </el-form-item>
+
+        <el-form-item label="回测股票池" required>
+          <div style="width: 100%">
+            <!-- Tags -->
+            <div class="stock-tags" v-if="stockCodes.length">
+              <el-tag
+                v-for="code in stockCodes" :key="code"
+                closable type="info"
+                size="small"
+                @close="removeStock(code)"
+                style="margin: 0 6px 6px 0"
+              >
+                {{ code }}
+              </el-tag>
+            </div>
+            <div style="display: flex; gap: 8px">
+              <el-autocomplete
+                v-model="stockInput"
+                :fetch-suggestions="fetchSuggestions"
+                :trigger-on-focus="false"
+                placeholder="输入股票代码搜索，如 000001"
+                style="flex: 1"
+                @select="(item: any) => addStock(item.code)"
+                @keyup.enter="batchAdd"
+                clearable
+              >
+                <template #default="{ item }">
+                  <span>{{ item.value }}</span>
+                </template>
+              </el-autocomplete>
+              <el-button @click="batchAdd">添加</el-button>
+            </div>
+            <div style="font-size: 12px; color: #909399; margin-top: 4px">
+              支持逗号或换行分隔批量输入，如 000001.SZ, 600000.SH
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item label="回测日期范围" required>
@@ -120,7 +221,6 @@ async function submit() {
 </template>
 
 <style scoped>
-.create-backtest h2 {
-  margin-bottom: 20px;
-}
+.create-backtest h2 { margin-bottom: 20px; }
+.stock-tags { margin-bottom: 8px; }
 </style>

@@ -1,5 +1,6 @@
 """Backtest endpoints — CRUD, execution, results."""
 
+import json
 import uuid
 from datetime import date
 
@@ -53,12 +54,12 @@ async def create_backtest(
             "name": req.name or f"回测 {req.start_date}~{req.end_date}",
             "start": req.start_date,
             "end": req.end_date,
-            "pool": str(req.stock_pool).replace("'", '"'),
+            "pool": json.dumps(req.stock_pool),
             "cap": req.initial_capital,
             "mode": req.position_mode,
             "bench": req.benchmark,
             "adj": req.adjust_mode,
-            "cost": str(req.cost_config).replace("'", '"'),
+            "cost": json.dumps(req.cost_config),
         },
     )
     await db.commit()
