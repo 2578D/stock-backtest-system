@@ -75,6 +75,12 @@ export const dashboardApi = {
   },
 };
 
+export const pickerApi = {
+  run(data: { strategy_id: string; market?: string; exclude_st?: boolean; exclude_suspend?: boolean; max_results?: number }) {
+    return http.post("/picks/run", data);
+  },
+};
+
 export const systemApi = {
   getProfile() {
     return http.get("/system/profile");
