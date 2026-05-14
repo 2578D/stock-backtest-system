@@ -18,13 +18,13 @@ interface IndicatorDef {
 }
 
 const indicatorDefs: IndicatorDef[] = [
-  // 趋势类
-  { category: "趋势", label: "MA 简单均线",          params: [{ name: "周期", placeholder: "5" }],             operators: [">","<",">=","<="], thresholdLabel: "阈值" },
-  { category: "趋势", label: "EMA 指数均线",         params: [{ name: "周期", placeholder: "12" }],            operators: [">","<",">=","<="], thresholdLabel: "阈值" },
-  { category: "趋势", label: "BOLL 布林带",          params: [{ name: "周期", placeholder: "20" }],            operators: [">","<"],           thresholdLabel: "价格" },
+  // 趋势类 — 股价 vs 均线，动态适配每只股票
+  { category: "趋势", label: "MA 简单均线",          params: [{ name: "周期", placeholder: "5" }],             operators: ["cross_above","cross_below",">","<"], thresholdLabel: "" },
+  { category: "趋势", label: "EMA 指数均线",         params: [{ name: "周期", placeholder: "12" }],            operators: ["cross_above","cross_below",">","<"], thresholdLabel: "" },
+  { category: "趋势", label: "BOLL 布林带",          params: [{ name: "周期", placeholder: "20" }],            operators: [">","<"],           thresholdLabel: "上轨/下轨" },
   // 动量类
   { category: "动量", label: "MACD",                 params: [{ name: "快线", placeholder: "12" }, { name: "慢线", placeholder: "26" }, { name: "信号", placeholder: "9" }], operators: ["cross_above","cross_below"], thresholdLabel: "" },
-  { category: "动量", label: "RSI 相对强弱",         params: [{ name: "周期", placeholder: "14" }],            operators: [">","<",">=","<="], thresholdLabel: "阈值" },
+  { category: "动量", label: "RSI 相对强弱",         params: [{ name: "周期", placeholder: "14" }],            operators: [">","<",">=","<=","cross_above","cross_below"], thresholdLabel: "阈值" },
   { category: "动量", label: "KDJ 随机指标",         params: [{ name: "周期", placeholder: "9" }],             operators: ["cross_above","cross_below","<",">"], thresholdLabel: "阈值" },
   // 交叉类
   { category: "交叉", label: "金叉",                 params: [{ name: "快线周期", placeholder: "5" }, { name: "慢线周期", placeholder: "20" }], operators: [], thresholdLabel: "" },
@@ -46,8 +46,8 @@ interface Condition {
   threshold: string;
 }
 
-const buyConditions = ref<Condition[]>([{ defIndex: 0, params: ["5"], operator: ">", threshold: "20" }]);
-const sellConditions = ref<Condition[]>([{ defIndex: 0, params: ["5"], operator: "<", threshold: "20" }]);
+const buyConditions = ref<Condition[]>([{ defIndex: 0, params: ["5"], operator: "cross_above", threshold: "" }]);
+const sellConditions = ref<Condition[]>([{ defIndex: 0, params: ["5"], operator: "cross_below", threshold: "" }]);
 
 function def(c: Condition) { return indicatorDefs[c.defIndex]; }
 function paramNames(c: Condition) { return def(c).params; }
@@ -67,8 +67,8 @@ function resetOnChange(cond: Condition, idx: number, isBuy: boolean) {
 }
 function onIndicatorChange(c: Condition, i: number, isBuy: boolean) { resetOnChange(c, i, isBuy); }
 
-function addBuy() { buyConditions.value.push({ defIndex: 0, params: ["5"], operator: ">", threshold: "20" }); }
-function addSell() { sellConditions.value.push({ defIndex: 0, params: ["5"], operator: "<", threshold: "20" }); }
+function addBuy() { buyConditions.value.push({ defIndex: 0, params: ["5"], operator: "cross_above", threshold: "" }); }
+function addSell() { sellConditions.value.push({ defIndex: 0, params: ["5"], operator: "cross_below", threshold: "" }); }
 function removeBuy(i: number) { buyConditions.value.splice(i, 1); }
 function removeSell(i: number) { sellConditions.value.splice(i, 1); }
 
@@ -81,6 +81,12 @@ function exprPreview(c: Condition): string {
   }
   if (!showOperator(c)) return name;
   const op = operatorLabels[c.operator] || c.operator;
+  // MA/EMA/BOLL: compare close price vs indicator, not indicator vs fixed threshold
+  const isTrend = ["MA 简单均线", "EMA 指数均线", "BOLL 布林带"].includes(d.label);
+  if (isTrend) {
+    const prefix = d.label === "BOLL 布林带" ? "收盘价" : "收盘价";
+    return `${prefix} ${op} ${name}`;
+  }
   if (!showThreshold(c)) return `${name} ${op}`;
   return `${name} ${op} ${c.threshold}`;
 }

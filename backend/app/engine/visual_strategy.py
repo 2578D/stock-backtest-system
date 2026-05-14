@@ -365,7 +365,7 @@ class VisualStrategy(IStrategy):
 
         results = []
         for c in conditions:
-            results.append(self._eval_single(c, indicators, prev_indicators))
+            results.append(self._eval_single(c, symbol, indicators, prev_indicators))
 
         # All conditions must be true (AND logic)
         return all(results) if results else False
@@ -373,85 +373,164 @@ class VisualStrategy(IStrategy):
     def _eval_single(
         self,
         cond: ConditionDef,
+        symbol: str,
         indicators: dict,
         prev_indicators: dict,
     ) -> bool:
-        """Evaluate a single condition."""
+        """Evaluate a single condition.
+
+        For trend indicators (MA/EMA/BOLL): compares close price vs indicator value.
+        For other indicators: compares indicator value vs threshold.
+        """
         name = cond.indicator
         params = cond.params
         op = cond.operator
         threshold = cond.threshold
 
-        # Build indicator key and get value
-        if name in ("MA", "EMA", "RSI"):
+        # Get close price from the current bar for this symbol
+        bar = self._latest_bar.get(symbol, {})
+        close = bar.get("close", 0)
+        prev_close = prev_indicators.get("close") if prev_indicators else None
+
+        # ── MA / EMA: close vs moving average ──
+        if name in ("MA", "EMA"):
             key = f"{name}({params[0]:.0f})"
             val = indicators.get(key)
             prev_val = prev_indicators.get(key)
+            if val is None or close is None:
+                return False
+            if op == "cross_above":
+                return prev_val is not None and prev_close is not None and prev_close <= prev_val and close > val
+            elif op == "cross_below":
+                return prev_val is not None and prev_close is not None and prev_close >= prev_val and close < val
+            elif op == ">":
+                return close > val
+            elif op == "<":
+                return close < val
+            elif op == ">=":
+                return close >= val
+            elif op == "<=":
+                return close <= val
+            return False
+
+        # ── BOLL: close vs bollinger bands ──
         elif name == "BOLL":
             p = int(params[0])
-            val = indicators.get(f"BOLL_mid({p})")
-            # For BOLL, use close vs upper/mid/lower
-            close = indicators.get("close") or self._latest_bar.get(symbol, {}).get("close", 0)
-            # Which band? default upper
-            val = indicators.get(f"BOLL_upper({p})")
+            upper = indicators.get(f"BOLL_upper({p})")
+            lower = indicators.get(f"BOLL_lower({p})")
+            if upper is None or close is None:
+                return False
+            # ">" means close breaks above upper band; "<" means close breaks below lower band
+            if op == ">":
+                return close > upper
+            elif op == "<":
+                return close < lower
+            return False
+
+        # ── MACD: DIF vs DEA ──
         elif name == "MACD":
             fast, slow = int(params[0]), int(params[1])
             val = indicators.get(f"MACD_dif({fast},{slow})")
             prev_val = prev_indicators.get(f"MACD_dif({fast},{slow})")
             dea = indicators.get(f"MACD_dea({fast},{slow})")
             prev_dea = prev_indicators.get(f"MACD_dea({fast},{slow})")
+            if val is None or dea is None:
+                return False
+            if op == "cross_above":
+                return prev_val is not None and prev_dea is not None and prev_val <= prev_dea and val > dea
+            elif op == "cross_below":
+                return prev_val is not None and prev_dea is not None and prev_val >= prev_dea and val < dea
+            return False
+
+        # ── KDJ ──
         elif name == "KDJ":
             p = int(params[0])
             val = indicators.get(f"KDJ_k({p})")
             prev_val = prev_indicators.get(f"KDJ_k({p})")
+            if val is None:
+                return False
+            if op == "cross_above":
+                # K crosses above D
+                d_val = indicators.get(f"KDJ_d({p})")
+                prev_d = prev_indicators.get(f"KDJ_d({p})")
+                return prev_val is not None and prev_d is not None and d_val is not None and prev_val <= prev_d and val > d_val
+            elif op == "cross_below":
+                d_val = indicators.get(f"KDJ_d({p})")
+                prev_d = prev_indicators.get(f"KDJ_d({p})")
+                return prev_val is not None and prev_d is not None and d_val is not None and prev_val >= prev_d and val < d_val
+            else:
+                return self._cmp_op(op, float(val), float(threshold))
+
+        # ── RSI ──
+        elif name == "RSI":
+            key = f"{name}({params[0]:.0f})"
+            val = indicators.get(key)
+            prev_val = prev_indicators.get(key)
+            if val is None:
+                return False
+            if op in ("cross_above", "cross_below"):
+                return prev_val is not None and self._cross(op, prev_val, val, float(threshold))
+            return self._cmp_op(op, float(val), float(threshold))
+
+        # ── 金叉 / 死叉: fast MA crosses slow MA ──
         elif name in ("金叉", "死叉"):
             fast_p, slow_p = int(params[0]), int(params[1])
             fast_key = f"MA({fast_p})"
             slow_key = f"MA({slow_p})"
-            val = indicators.get(fast_key)
+            fast_val = indicators.get(fast_key)
             slow_val = indicators.get(slow_key)
-            prev_val = prev_indicators.get(fast_key)
-            prev_slow_val = prev_indicators.get(slow_key)
+            prev_fast = prev_indicators.get(fast_key)
+            prev_slow = prev_indicators.get(slow_key)
+            if fast_val is None or slow_val is None or prev_fast is None or prev_slow is None:
+                return False
+            if name == "金叉":
+                return prev_fast <= prev_slow and fast_val > slow_val
+            else:
+                return prev_fast >= prev_slow and fast_val < slow_val
+
+        # ── 成交量 / 换手率 / 涨跌幅 / 收盘价: indicator vs threshold ──
         elif name == "成交量":
             val = indicators.get("volume")
             vol_ma = indicators.get("volume_ma5")
+            if val is None:
+                return False
+            # threshold is N日均量倍数, compare: volume vs vol_ma5 * N
+            real_threshold = vol_ma * float(threshold) if vol_ma else 0
+            return self._cmp_op(op, float(val), real_threshold) if real_threshold else False
         elif name == "换手率":
             val = indicators.get("turnover")
+            if val is None:
+                return False
+            return self._cmp_op(op, float(val), float(threshold))
         elif name == "涨跌幅":
             val = indicators.get("change_pct")
+            if val is None:
+                return False
+            return self._cmp_op(op, float(val), float(threshold))
         elif name == "收盘价":
             val = indicators.get("close")
-        else:
-            return False
+            if val is None:
+                return False
+            return self._cmp_op(op, float(val), float(threshold))
 
-        if val is None:
-            return False
+        return False
 
-        # Evaluate operator
+    @staticmethod
+    def _cmp_op(op: str, val: float, threshold: float) -> bool:
         if op == ">":
-            return float(val) > float(threshold)
+            return val > threshold
         elif op == "<":
-            return float(val) < float(threshold)
+            return val < threshold
         elif op == ">=":
-            return float(val) >= float(threshold)
+            return val >= threshold
         elif op == "<=":
-            return float(val) <= float(threshold)
-        elif op == "cross_above":
-            if prev_val is None:
-                return False
-            if name == "金叉":
-                return prev_val <= prev_slow_val and val > slow_val
-            # MACD DIF crosses above DEA
-            if name == "MACD":
-                return prev_val <= prev_dea and val > dea
-            return False
-        elif op == "cross_below":
-            if prev_val is None:
-                return False
-            if name == "死叉":
-                return prev_val >= prev_slow_val and val < slow_val
-            if name == "MACD":
-                return prev_val >= prev_dea and val < dea
-            return False
+            return val <= threshold
+        return False
 
+    @staticmethod
+    def _cross(op: str, prev_val: float, val: float, threshold: float) -> bool:
+        if op == "cross_above":
+            return prev_val <= threshold and val > threshold
+        elif op == "cross_below":
+            return prev_val >= threshold and val < threshold
         return False
