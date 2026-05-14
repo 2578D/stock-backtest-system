@@ -2,7 +2,9 @@
 import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { useRoute } from "vue-router";
 import { backtestApi } from "@/api";
+import { ElMessage } from "element-plus";
 import * as echarts from "echarts";
+import { Download } from "@element-plus/icons-vue";
 
 const route = useRoute();
 const taskId = route.params.id as string;
@@ -193,6 +195,60 @@ function fmtNum(v: number | null | undefined) {
   if (v == null) return "-";
   return v.toFixed(2);
 }
+
+// Export results as CSV
+function exportCSV() {
+  const m = result.value;
+  const t = task.value;
+  if (!m.total_return) { ElMessage.warning("无数据可导出"); return; }
+
+  const lines = [
+    ["指标", "数值"],
+    ["策略", t.name || "-"],
+    ["日期范围", `${t.start_date} ~ ${t.end_date}`],
+    ["初始资金", `¥${(t.initial_capital || 0).toLocaleString()}`],
+    ["总收益率", fmtPct(m.total_return)],
+    ["年化收益率", fmtPct(m.annual_return)],
+    ["最大回撤", fmtPct(m.max_drawdown)],
+    ["夏普比率", fmtNum(m.sharpe_ratio)],
+    ["卡尔马比率", fmtNum(m.calmar_ratio)],
+    ["索提诺比率", fmtNum(m.sortino_ratio)],
+    ["胜率", fmtPct(m.win_rate)],
+    ["盈亏比", fmtNum(m.profit_loss_ratio)],
+    ["交易次数", String(m.trade_count ?? "-")],
+    ["年化波动率", fmtPct(m.annual_volatility)],
+    ["基准收益率", fmtPct(m.benchmark_return)],
+    ["超额收益", fmtPct(m.excess_return)],
+    ["最大单笔盈利", m.max_single_profit != null ? `¥${m.max_single_profit.toFixed(2)}` : "-"],
+    ["最大单笔亏损", m.max_single_loss != null ? `¥${m.max_single_loss.toFixed(2)}` : "-"],
+    [],
+    ["--- 交易明细 ---"],
+    ["代码", "买入日", "买入价", "卖出日", "卖出价", "数量", "持有天数", "收益率"],
+  ];
+
+  for (const tr of trades.value) {
+    lines.push([
+      tr.stock_code,
+      tr.buy_date,
+      tr.buy_price?.toFixed(2),
+      tr.sell_date,
+      tr.sell_price?.toFixed(2),
+      String(tr.quantity),
+      String(tr.hold_days),
+      tr.return_rate != null ? (tr.return_rate * 100).toFixed(2) + "%" : "-",
+    ]);
+  }
+
+  const csv = lines.map((l) => l.join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `backtest_${taskId.slice(0, 8)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  ElMessage.success("CSV 报告已下载");
+}
 function statusTag(s: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
   const map: Record<string, 'info' | 'warning' | 'success' | 'danger'> = { pending: 'info', running: 'warning', completed: 'success', failed: 'danger' };
   return (map[s] as 'info' | 'warning' | 'success' | 'danger') || 'info';
@@ -223,6 +279,7 @@ onUnmounted(() => { chartInstance?.dispose(); });
           />
         </template>
       </el-page-header>
+      <el-button v-if="task.status === 'completed'" size="small" @click="exportCSV" :icon="Download">导出 CSV</el-button>
     </div>
 
     <el-tabs v-model="activeTab" style="margin-top: 16px">
