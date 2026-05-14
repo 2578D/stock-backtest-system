@@ -159,13 +159,19 @@ def _save_result(task_id: str, config: BacktestConfig, result) -> None:
                 sharpe_ratio, calmar_ratio, sortino_ratio,
                 win_rate, profit_loss_ratio, trade_count,
                 avg_hold_days, max_single_profit, max_single_loss,
-                equity_curve, daily_returns)
+                equity_curve, benchmark_curve, daily_returns,
+                benchmark_return, excess_return)
                 VALUES (:tid, :tr, :tra, :ar, :mdd, :mddd, :av, :sr, :cr, :sor,
-                :wr, :plr, :tc, :ahd, :msp, :msl, :ec, :dr)
+                :wr, :plr, :tc, :ahd, :msp, :msl, :ec, :bc, :dr, :br, :er)
                 ON CONFLICT (task_id) DO UPDATE SET
                 total_return = EXCLUDED.total_return,
                 sharpe_ratio = EXCLUDED.sharpe_ratio,
-                max_drawdown = EXCLUDED.max_drawdown"""
+                max_drawdown = EXCLUDED.max_drawdown,
+                equity_curve = EXCLUDED.equity_curve,
+                benchmark_curve = EXCLUDED.benchmark_curve,
+                benchmark_return = EXCLUDED.benchmark_return,
+                excess_return = EXCLUDED.excess_return,
+                daily_returns = EXCLUDED.daily_returns"""
             ),
             {
                 "tid": task_id,
@@ -185,7 +191,10 @@ def _save_result(task_id: str, config: BacktestConfig, result) -> None:
                 "msp": m.max_single_profit,
                 "msl": m.max_single_loss,
                 "ec": json.dumps(result.equity_curve),
+                "bc": json.dumps(result.benchmark_returns) if result.benchmark_returns else None,
                 "dr": json.dumps(list(result.daily_returns.values())),
+                "br": m.benchmark_return,
+                "er": m.excess_return,
             },
         )
 

@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS backtest_result (
     trade_count     INTEGER DEFAULT 0,
     avg_hold_days   NUMERIC(10,2),
     equity_curve    JSONB,
+    benchmark_curve JSONB,
     drawdown_curve  JSONB,
     monthly_returns JSONB,
     daily_returns   JSONB

@@ -68,6 +68,11 @@ jobs:
 
             cd /opt/stock-backtest
             sudo docker compose up -d --build 2>&1
+
+            # Run DB migration (wait for postgres)
+            sleep 5
+            sudo docker exec stock-backtest-postgres-1 psql -U postgres -d stock_backtest -f /docker-entrypoint-initdb.d/02-migration-20260514.sql 2>/dev/null || true
+
             sudo docker exec stock-backtest-nginx-1 nginx -s reload
             sudo docker image prune -f
           command_timeout: 30m

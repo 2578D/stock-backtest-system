@@ -55,13 +55,27 @@ function renderChart() {
   const dailyRets = result.value.daily_returns;
   const retValues: number[] = [];
   if (Array.isArray(dailyRets)) {
-    // daily_returns is array of floats, same length as dates
     for (let i = 0; i < dates.length; i++) {
       retValues.push(Number(dailyRets[i] || 0) * 100);
     }
   }
 
-  // Markdown region (max drawdown)
+  // Benchmark curve: cumulative NAV from daily returns
+  const benchRets = result.value.benchmark_curve || {};
+  let benchNav = initialCapital;
+  const benchDateIdx: Record<string, number> = {};
+  const benchNavs: number[] = [];
+  const benchDates = Object.keys(benchRets).sort();
+  for (const d of benchDates) {
+    benchNav *= (1 + Number(benchRets[d]));
+    benchNavs.push(benchNav);
+    benchDateIdx[d] = benchNavs.length - 1;
+  }
+  const benchAligned: (number | null)[] = dates.map((d) =>
+    benchDateIdx[d] !== undefined ? benchNavs[benchDateIdx[d]] : null
+  );
+
+  // Max drawdown region
   let drawdownStart = 0;
   let drawdownEnd = 0;
   let peak = navs[0];
@@ -96,7 +110,7 @@ function renderChart() {
       },
     },
     legend: {
-      data: ["资金曲线", "日收益率"],
+      data: ["资金曲线", "基准曲线", "日收益率"],
       top: 0,
     },
     grid: { top: 40, left: 70, right: 70, bottom: 40 },
@@ -139,6 +153,16 @@ function renderChart() {
         },
         markArea: markArea,
       },
+      // Benchmark curve
+      ...(benchNavs.length > 0 ? [{
+        name: "基准曲线",
+        type: "line",
+        data: benchAligned,
+        smooth: true,
+        showSymbol: false,
+        lineStyle: { color: "#909399", width: 2, type: "dashed" as const },
+        connectNulls: false,
+      }] : []),
       ...(retValues.length > 0 ? [{
         name: "日收益率",
         type: "bar",

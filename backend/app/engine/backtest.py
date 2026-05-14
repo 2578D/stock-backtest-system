@@ -54,8 +54,9 @@ class BacktestResult:
     metrics: PerformanceMetrics
     equity_curve: dict[str, float]           # date → nav
     daily_returns: dict[str, float]          # date → return
-    trades: list[dict]                       # all trades
-    position_snapshots: dict[str, dict]      # date → positions
+    benchmark_returns: dict[str, float] = field(default_factory=dict)  # date → benchmark return
+    trades: list[dict] = field(default_factory=list)
+    position_snapshots: dict[str, dict] = field(default_factory=dict)
 
 
 class BacktestEngine:
@@ -92,6 +93,28 @@ class BacktestEngine:
 
     def set_strategy(self, strategy: IStrategy) -> None:
         self.strategy = strategy
+
+    def _load_benchmark(self) -> dict[date, float]:
+        """Load benchmark index daily close prices for the backtest period."""
+        from sqlalchemy import text
+        benchmark = self.config.benchmark
+        result: dict[date, float] = {}
+        try:
+            with self._session_factory() as s:
+                rows = s.execute(
+                    text(
+                        """SELECT trade_date, close FROM stock_daily
+                        WHERE code = :code AND trade_date >= :start AND trade_date <= :end
+                        ORDER BY trade_date"""
+                    ),
+                    {"code": benchmark, "start": self.config.start_date, "end": self.config.end_date},
+                ).fetchall()
+                for row in rows:
+                    result[row[0]] = float(row[1])
+            logger.info(f"Loaded benchmark {benchmark}: {len(result)} days")
+        except Exception as e:
+            logger.warning(f"Failed to load benchmark {benchmark}: {e}")
+        return result
 
     def _wire_events(self) -> None:
         def on_bar(event: Event) -> None:
@@ -154,6 +177,9 @@ class BacktestEngine:
         # Load market data
         self.market.load()
 
+        # Load benchmark data
+        benchmark_closes: dict[date, float] = self._load_benchmark()
+
         # Init strategy
         from app.engine.strategy import StrategyContext
 
@@ -166,6 +192,10 @@ class BacktestEngine:
             lambda cur, tot: logger.info(f"Progress: {cur}/{tot} ({cur/tot*100:.0f}%)"),
             total_days,
         )
+
+        # Track benchmark returns
+        benchmark_rets: dict[str, float] = {}
+        prev_bench_close: float = 0.0
 
         # Main loop
         while self.market.has_next():
@@ -203,14 +233,25 @@ class BacktestEngine:
 
             self.collector.record_day(current_date, current_value, daily_return, positions_snap)
 
+            # Compute benchmark daily return
+            bench_close = benchmark_closes.get(current_date)
+            if bench_close and bench_close > 0 and prev_bench_close > 0:
+                bench_ret = (bench_close - prev_bench_close) / prev_bench_close
+                benchmark_rets[str(current_date)] = bench_ret
+                prev_bench_close = bench_close
+            elif bench_close and bench_close > 0:
+                prev_bench_close = bench_close
+
         # Strategy cleanup
         self.strategy.on_stop(ctx, self.trader.portfolio)
 
         # Compute metrics
         daily_rets = self.collector.get_daily_returns()
+        bench_daily_list = [benchmark_rets[d] for d in sorted(benchmark_rets)] if benchmark_rets else None
         metrics = compute_metrics(
             daily_returns=daily_rets,
             initial_capital=self.config.initial_capital,
+            benchmark_returns=bench_daily_list,
             trades=self.trader.trades,
         )
 
@@ -225,6 +266,7 @@ class BacktestEngine:
             metrics=metrics,
             equity_curve=self.collector.get_equity_curve(),
             daily_returns=self.collector.get_daily_returns_with_dates(),
+            benchmark_returns=benchmark_rets,
             trades=self.trader.trades,
             position_snapshots=self.collector.position_snapshots,
         )

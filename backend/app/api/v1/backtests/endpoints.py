@@ -138,7 +138,7 @@ async def get_backtest_result(task_id: str, db: AsyncSession = Depends(get_db)):
             calmar_ratio, sortino_ratio, win_rate, profit_loss_ratio, trade_count,
             annual_volatility, benchmark_return, excess_return, max_drawdown_days,
             avg_hold_days, max_single_profit, max_single_loss,
-            equity_curve, daily_returns
+            equity_curve, benchmark_curve, daily_returns
             FROM backtest_result WHERE task_id = CAST(:id AS UUID)"""
         ),
         {"id": task_id},
@@ -167,7 +167,8 @@ async def get_backtest_result(task_id: str, db: AsyncSession = Depends(get_db)):
             "max_single_profit": float(row[14]) if row[14] else None,
             "max_single_loss": float(row[15]) if row[15] else None,
             "equity_curve": row[16] if isinstance(row[16], dict) else (json.loads(row[16]) if row[16] else {}),
-            "daily_returns": row[17] if isinstance(row[17], list) else (json.loads(row[17]) if row[17] else []),
+            "benchmark_curve": row[17] if isinstance(row[17], dict) else (json.loads(row[17]) if row[17] else {}),
+            "daily_returns": row[18] if isinstance(row[18], list) else (json.loads(row[18]) if row[18] else []),
         },
     }
 
