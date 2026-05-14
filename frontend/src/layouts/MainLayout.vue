@@ -12,6 +12,7 @@ const menuItems = computed(() => [
   { path: "/data/stocks", title: "数据中心", icon: "Coin" },
   { path: "/strategies", title: "策略中心", icon: "Opportunity" },
   { path: "/picker", title: "选股器", icon: "Filter" },
+  { path: "/signals", title: "每日信号", icon: "AlarmClock" },
   { path: "/backtests", title: "回测中心", icon: "DataAnalysis" },
   { path: "/settings", title: "系统设置", icon: "Tools" },
 ]);

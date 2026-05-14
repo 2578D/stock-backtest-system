@@ -92,6 +92,12 @@ const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: "signals",
+        name: "DailySignals",
+        component: () => import("@/views/signals/DailySignalsView.vue"),
+        meta: { title: "每日信号", icon: "AlarmClock" },
+      },
+      {
         path: "settings",
         name: "Settings",
         component: () => import("@/views/system/SettingsView.vue"),
