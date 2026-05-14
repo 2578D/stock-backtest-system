@@ -56,6 +56,7 @@ def _build_config(task: dict) -> BacktestConfig:
         initial_capital=float(task.get("initial_capital", 1_000_000)),
         benchmark=task.get("benchmark", "000300.SH"),
         position_mode=task.get("position_mode", "fixed"),
+        period=task.get("period", "daily"),
         adjust_mode=task.get("adjust_mode", "forward"),
     )
 
@@ -111,8 +112,9 @@ def run_backtest(self, task_id: str, strategy_code: str = "") -> dict:
             else:
                 # Visual strategy — compile rules into VisualStrategy
                 rules = strat_row[1] if strat_row[1] else {}
-                config = parse_visual_rules(rules)
-                strategy = VisualStrategy(config)
+                vs_config = parse_visual_rules(rules)
+                vs_config.position_mode = config.position_mode
+                strategy = VisualStrategy(vs_config)
         else:
             strategy = _SimpleStrategy()
 

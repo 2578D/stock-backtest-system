@@ -49,6 +49,7 @@ class VisualStrategyConfig:
     stop_loss: float = 0.08
     take_profit: float = 0.15
     fixed_amount: float = 50000.0  # fixed amount per buy
+    position_mode: str = "fixed"   # "fixed" | "percent" | "equal_weight"
 
 
 # ── Indicator registry ──────────────────────────
@@ -172,6 +173,7 @@ def parse_visual_rules(rules_json: dict) -> VisualStrategyConfig:
         max_holdings=int(risk.get("maxHoldings", 10)),
         stop_loss=float(risk.get("stopLoss", 0.08)),
         take_profit=float(risk.get("takeProfit", 0.15)),
+        position_mode=risk.get("positionMode", "fixed"),
     )
 
 
@@ -264,12 +266,22 @@ class VisualStrategy(IStrategy):
                 if current_holdings >= self._config.max_holdings:
                     return orders
 
-                qty = int(min(
-                    self._config.fixed_amount / price,
-                    max_value / price,
-                ))
-                if qty >= 100:  # A-share minimum lot is 100 shares
-                    qty = (qty // 100) * 100
+                # Position sizing based on mode
+                if self._config.position_mode == "equal_weight":
+                    # Equal split among all stocks in pool + current holdings
+                    total_slots = max(current_holdings + 1, 1)
+                    per_stock = portfolio.total_value * self._config.max_position_ratio / total_slots
+                    qty = int(per_stock / price)
+                elif self._config.position_mode == "percent":
+                    # Fixed percentage of portfolio per trade
+                    qty = int(max_value * 0.1 / price)  # 10% of max allowed per trade
+                else:
+                    # fixed_amount mode
+                    qty = int(min(
+                        self._config.fixed_amount / price,
+                        max_value / price,
+                    ))
+                qty = (qty // 100) * 100
                     self._entry_price[symbol] = price
                     orders.append(Order(
                         symbol, "buy", qty, price,

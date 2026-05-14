@@ -16,6 +16,7 @@ const form = ref({
   endDate: "",
   initialCapital: 1000000,
   positionMode: "fixed",
+  period: "daily",
   benchmark: "000300.SH",
   adjustMode: "forward",
 });
@@ -118,6 +119,7 @@ async function submit() {
       end_date: form.value.endDate,
       initial_capital: form.value.initialCapital,
       position_mode: form.value.positionMode,
+      period: form.value.period,
       benchmark: form.value.benchmark,
       adjust_mode: form.value.adjustMode,
       stock_pool: { symbols: stockCodes.value },
@@ -192,6 +194,27 @@ async function submit() {
 
         <el-form-item label="初始资金">
           <el-input-number v-model="form.initialCapital" :min="10000" :step="100000" style="width: 100%" />
+        </el-form-item>
+
+        <el-form-item label="仓位分配">
+          <el-radio-group v-model="form.positionMode">
+            <el-radio-button value="fixed">固定金额</el-radio-button>
+            <el-radio-button value="percent">百分比</el-radio-button>
+            <el-radio-button value="equal_weight">等权重</el-radio-button>
+          </el-radio-group>
+          <div style="font-size: 12px; color: #909399; margin-top: 4px">
+            <template v-if="form.positionMode === 'fixed'">每笔交易固定 5 万元</template>
+            <template v-else-if="form.positionMode === 'percent'">每次买入总资金的 3%</template>
+            <template v-else>总资金在股票池中平均分配</template>
+          </div>
+        </el-form-item>
+
+        <el-form-item label="K线周期">
+          <el-radio-group v-model="form.period">
+            <el-radio-button value="daily">日线</el-radio-button>
+            <el-radio-button value="weekly">周线</el-radio-button>
+            <el-radio-button value="monthly">月线</el-radio-button>
+          </el-radio-group>
         </el-form-item>
 
         <el-form-item label="基准指数">

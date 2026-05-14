@@ -24,6 +24,7 @@ class CreateBacktestRequest(BaseModel):
     stock_pool: dict = {}
     initial_capital: float = 1_000_000.0
     position_mode: str = "fixed"
+    period: str = "daily"
     benchmark: str = "000300.SH"
     adjust_mode: str = "forward"
     cost_config: dict = {}
@@ -42,9 +43,9 @@ async def create_backtest(
         text(
             """INSERT INTO backtest_task
             (id, user_id, strategy_id, name, start_date, end_date, stock_pool,
-             initial_capital, position_mode, benchmark, adjust_mode, cost_config, status)
+             initial_capital, position_mode, period, benchmark, adjust_mode, cost_config, status)
             VALUES (CAST(:id AS UUID), CAST(:uid AS UUID), CAST(:sid AS UUID), :name,
-             :start, :end, CAST(:pool AS JSONB), :cap, :mode, :bench, :adj,
+             :start, :end, CAST(:pool AS JSONB), :cap, :mode, :period, :bench, :adj,
              CAST(:cost AS JSONB), 'pending')"""
         ),
         {
@@ -57,6 +58,7 @@ async def create_backtest(
             "pool": json.dumps(req.stock_pool),
             "cap": req.initial_capital,
             "mode": req.position_mode,
+            "period": req.period,
             "bench": req.benchmark,
             "adj": req.adjust_mode,
             "cost": json.dumps(req.cost_config),
@@ -79,7 +81,7 @@ async def list_backtests(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         text(
             """SELECT id, name, strategy_id, start_date, end_date, status, progress,
-            initial_capital, created_at FROM backtest_task ORDER BY created_at DESC LIMIT 50"""
+            initial_capital, position_mode, period, created_at FROM backtest_task ORDER BY created_at DESC LIMIT 50"""
         )
     )
     rows = result.fetchall()
@@ -90,7 +92,8 @@ async def list_backtests(db: AsyncSession = Depends(get_db)):
                 "id": str(r[0]), "name": r[1], "strategy_id": str(r[2]),
                 "start_date": str(r[3]), "end_date": str(r[4]),
                 "status": r[5], "progress": r[6],
-                "initial_capital": float(r[7]), "created_at": str(r[8]) if r[8] else None,
+                "initial_capital": float(r[7]), "position_mode": r[8], "period": r[9],
+                "created_at": str(r[10]) if r[10] else None,
             }
             for r in rows
         ],

@@ -14,11 +14,12 @@ logger = logging.getLogger(__name__)
 class MarketReplayer:
     """Loads stock daily data and replays bar-by-bar in chronological order."""
 
-    def __init__(self, db_session_factory, stock_pool: list[str], start_date: date, end_date: date):
+    def __init__(self, db_session_factory, stock_pool: list[str], start_date: date, end_date: date, period: str = "daily"):
         self._session_factory = db_session_factory
         self._stock_pool = stock_pool
         self._start_date = start_date
         self._end_date = end_date
+        self._period = period  # "daily" | "weekly" | "monthly"
 
         # symbol → DataFrame (index=date, columns=open/high/low/close/volume/amount)
         self._data: dict[str, pd.DataFrame] = {}
@@ -90,6 +91,43 @@ class MarketReplayer:
             d for d in self._all_dates if self._start_date <= d <= self._end_date
         ]
         logger.info(f"Loaded data: {len(self._all_dates)} trading days, {len(self._data)} stocks")
+
+        # Resample if needed
+        if self._period != "daily":
+            self._resample()
+
+    def _resample(self) -> None:
+        """Resample daily data to weekly or monthly bars."""
+        rule = "W" if self._period == "weekly" else "M"
+        logger.info(f"Resampling daily data to {self._period} ({rule})...")
+
+        new_data: dict[str, pd.DataFrame] = {}
+        all_trade_dates: set[date] = set()
+
+        for symbol, df in self._data.items():
+            if df.empty:
+                continue
+            resampled = df.resample(rule).agg({
+                "open": "first",
+                "high": "max",
+                "low": "min",
+                "close": "last",
+                "volume": "sum",
+                "amount": "sum",
+            }).dropna()
+            if resampled.empty:
+                continue
+            new_data[symbol] = resampled
+            dates_list = sorted(resampled.index.tolist())
+            self._dates[symbol] = [d.date() if hasattr(d, 'date') else d for d in dates_list]
+            all_trade_dates.update(self._dates[symbol])
+
+        self._data = new_data
+        self._all_dates = sorted(all_trade_dates)
+        self._all_dates = [
+            d for d in self._all_dates if self._start_date <= d <= self._end_date
+        ]
+        logger.info(f"Resampled: {len(self._all_dates)} {self._period} bars, {len(self._data)} stocks")
 
     def has_next(self) -> bool:
         return self._cursor < len(self._all_dates)

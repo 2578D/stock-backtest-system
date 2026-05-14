@@ -37,7 +37,8 @@ class BacktestConfig:
     end_date: date = date(2025, 12, 31)
     initial_capital: float = 1_000_000.0
     benchmark: str = "000300.SH"
-    position_mode: str = "fixed"    # "fixed" or "percent"
+    position_mode: str = "fixed"    # "fixed" | "percent" | "equal_weight"
+    period: str = "daily"          # "daily" | "weekly" | "monthly"
     adjust_mode: str = "forward"    # "forward" / "backward" / "none"
     risk: RiskConfig | None = None
 
@@ -78,6 +79,7 @@ class BacktestEngine:
             config.stock_pool,
             config.start_date,
             config.end_date,
+            config.period,
         )
         self.risk = RiskManager(config.risk)
         self.trader = TradeSimulator(config.initial_capital, self.risk, self.event_bus)
