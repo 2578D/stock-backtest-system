@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from "vue";
+import { ref, onUnmounted, computed } from "vue";
 import { ElMessage } from "element-plus";
 import { dataApi } from "@/api";
-import http from "@/api/http";
 
 const syncStatus = ref("idle");
 const syncProgress = ref("");
+const syncMode = ref<"full" | "incremental">("full");
 const syncing = ref(false);
 const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null);
 
@@ -15,22 +15,34 @@ const stats = ref({
   latest_data_date: "",
 });
 
+// Data freshness: green=今日, yellow=昨日, red=更旧
+const freshnessTag = computed(() => {
+  if (!stats.value.latest_data_date) return { type: "danger" as const, text: "无数据" };
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (stats.value.latest_data_date >= today) return { type: "success" as const, text: "今日已更新" };
+  if (stats.value.latest_data_date >= yesterday) return { type: "warning" as const, text: "昨日数据" };
+  return { type: "danger" as const, text: `最新: ${stats.value.latest_data_date}` };
+});
+
 async function fetchStats() {
   try {
-    const res = await http.get("/data/sync/stats");
+    const res = await dataApi.getSyncStats();
     if (res.data?.code === 0) {
       stats.value = res.data.data;
     }
   } catch {}
 }
 
-async function startFullSync() {
+async function doSync(mode: "full" | "incremental") {
   syncing.value = true;
+  syncMode.value = mode;
   syncProgress.value = "";
   try {
-    const res = await http.post("/data/sync/full", { cookie: "" });
+    const fn = mode === "full" ? dataApi.triggerFullSync : dataApi.triggerIncrementalSync;
+    await fn();
     syncStatus.value = "running";
-    ElMessage.success("全量同步已启动（TickFlow 批量拉取）");
+    ElMessage.success(mode === "full" ? "全量同步已启动" : "增量同步已启动");
     startPolling();
   } catch {
     ElMessage.error("启动同步失败");
@@ -42,10 +54,9 @@ function startPolling() {
   if (pollingTimer.value) clearInterval(pollingTimer.value);
   pollingTimer.value = setInterval(async () => {
     try {
-      const res = await http.get("/data/sync/status");
+      const res = await dataApi.getSyncStatus();
       const data = res.data.data;
       syncProgress.value = data.progress || "";
-      // Format: "95.0% Generating trade calendar..."
       const m = data.progress?.match(/^(\d+\.?\d*)%/);
       const pct = m ? parseFloat(m[1]) : 0;
       if (data.status === "idle" || data.progress === "" || pct >= 100) {
@@ -90,8 +101,8 @@ fetchStats();
             type="info"
             :closable="false"
             style="margin-top: 12px"
-            title="数据同步说明"
-            description="首次全量同步约需 2-5 分钟（取决于网络），后续增量同步仅拉取缺失数据。同步期间回测服务不受影响。"
+            title="自动增量同步"
+            description="每天收盘后（15:30）自动拉取最新行情数据。每整点检查一次，周末/收盘前自动跳过。"
           />
         </el-card>
       </el-col>
@@ -107,7 +118,11 @@ fetchStats();
             </el-col>
           </el-row>
 
-          <div v-if="stats.latest_data_date" style="margin-top: 12px">
+          <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px">
+            <span style="font-size: 13px; color: #606266">数据新鲜度：</span>
+            <el-tag :type="freshnessTag.type" size="large">{{ freshnessTag.text }}</el-tag>
+          </div>
+          <div v-if="stats.latest_data_date" style="margin-top: 8px">
             <el-tag type="success">最新数据: {{ stats.latest_data_date }}</el-tag>
           </div>
           <el-empty v-else description="暂无数据" :image-size="80" />
@@ -116,12 +131,20 @@ fetchStats();
         <el-card header="同步操作" style="margin-top: 12px">
           <el-button
             type="primary"
-            :loading="syncing"
-            @click="startFullSync"
+            :loading="syncing && syncMode === 'full'"
+            @click="doSync('full')"
             style="width: 100%"
             :disabled="syncing"
           >
-            {{ syncing ? "同步中..." : "全量同步" }}
+            {{ syncing && syncMode === 'full' ? "同步中..." : "全量同步" }}
+          </el-button>
+          <el-button
+            style="width: 100%; margin-top: 8px"
+            :loading="syncing && syncMode === 'incremental'"
+            @click="doSync('incremental')"
+            :disabled="syncing"
+          >
+            {{ syncing && syncMode === 'incremental' ? "同步中..." : "增量同步（最近几天）" }}
           </el-button>
 
           <div v-if="syncProgress" style="margin-top: 12px">

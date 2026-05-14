@@ -28,6 +28,18 @@ export const dataApi = {
   listDataSources() {
     return http.get("/data/sources");
   },
+  triggerFullSync() {
+    return http.post("/data/sync/full", { cookie: "" });
+  },
+  triggerIncrementalSync() {
+    return http.post("/data/sync/incremental");
+  },
+  getSyncStatus() {
+    return http.get("/data/sync/status");
+  },
+  getSyncStats() {
+    return http.get("/data/sync/stats");
+  },
 };
 
 export const strategyApi = {

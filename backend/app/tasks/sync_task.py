@@ -29,6 +29,168 @@ def _set_progress(redis, key: str, pct: float, msg: str = ""):
         pass
 
 
+@celery_app.task(bind=True, name="data_sync.incremental_sync")
+def incremental_sync(self, lookback_days: int = 5):
+    """Incremental daily sync: fetch only the last N trading days for all stocks.
+
+    Runs every hour (Celery Beat), but skips if:
+    - Data is already up to date (latest trade_date = today or yesterday)
+    - It's before 15:30 on a weekday (market hasn't closed yet)
+    """
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+    weekday = now.weekday()
+
+    # Skip weekends
+    if weekday >= 5:
+        logger.info("Incremental sync skipped: weekend")
+        return {"status": "skipped", "reason": "weekend"}
+
+    # Skip if before 15:30 (market still open)
+    market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
+    if now < market_close:
+        logger.info("Incremental sync skipped: market not closed yet")
+        return {"status": "skipped", "reason": "before_market_close"}
+
+    redis = get_redis_sync()
+
+    # Check latest data date
+    with SyncSession() as s:
+        latest = s.execute(
+            text("SELECT MAX(trade_date) FROM stock_daily")
+        ).scalar()
+
+    today = now.date()
+    if latest and latest >= today:
+        logger.info(f"Incremental sync skipped: data already up-to-date ({latest})")
+        return {"status": "skipped", "reason": "up_to_date", "latest": str(latest)}
+
+    logger.info(f"Starting incremental sync (latest={latest}, today={today})")
+    _set_progress(redis, "incremental", 0, f"Incremental sync from {latest}...")
+
+    tf = TickFlowProvider()
+
+    # Get all active stocks
+    with SyncSession() as s:
+        codes = [
+            row[0] for row in s.execute(
+                text("SELECT code FROM stock_basic WHERE status = 1 ORDER BY code")
+            ).fetchall()
+        ]
+
+    if not codes:
+        return {"status": "skipped", "reason": "no_stocks"}
+
+    # Batch fetch
+    STOCKS_PER_BATCH = 100
+    ROWS_PER_INSERT = 500
+    total_rows = 0
+    failed = 0
+
+    INSERT_SQL = """INSERT INTO stock_daily
+    (code, trade_date, open, high, low, close, volume, amount)
+    VALUES {values_clause}
+    ON CONFLICT (code, trade_date) DO UPDATE SET
+        open = EXCLUDED.open, high = EXCLUDED.high,
+        low = EXCLUDED.low, close = EXCLUDED.close,
+        volume = EXCLUDED.volume, amount = EXCLUDED.amount"""
+
+    batches = [
+        codes[i : i + STOCKS_PER_BATCH]
+        for i in range(0, len(codes), STOCKS_PER_BATCH)
+    ]
+
+    for bi, batch in enumerate(batches):
+        pct = (bi / len(batches)) * 100
+        _set_progress(redis, "incremental", pct, f"Batch {bi+1}/{len(batches)}")
+
+        try:
+            data = tf.fetch_batch(batch)
+        except Exception as e:
+            logger.error(f"Incremental batch {bi+1} failed: {e}")
+            failed += len(batch)
+            continue
+
+        # Filter to only recent bars (last N days)
+        insert_rows = []
+        for sym in batch:
+            bars = data.get(sym, [])
+            for bar in bars:
+                # Only keep bars newer than latest date in DB
+                insert_rows.append({
+                    "code": sym,
+                    "td": bar["trade_date"],
+                    "o": bar["open"],
+                    "h": bar["high"],
+                    "l": bar["low"],
+                    "c": bar["close"],
+                    "v": bar["volume"],
+                    "a": bar["amount"],
+                })
+
+        if not insert_rows:
+            continue
+
+        # Bulk insert
+        with SyncSession() as s:
+            for i in range(0, len(insert_rows), ROWS_PER_INSERT):
+                chunk = insert_rows[i : i + ROWS_PER_INSERT]
+                placeholders = []
+                params = {}
+                for j, r in enumerate(chunk):
+                    p = f"_{j}"
+                    placeholders.append(
+                        f"(:c{p}, :td{p}, :o{p}, :h{p}, :l{p}, :cl{p}, :v{p}, :a{p})"
+                    )
+                    params.update({
+                        f"c{p}": r["code"],
+                        f"td{p}": r["td"],
+                        f"o{p}": r["o"],
+                        f"h{p}": r["h"],
+                        f"l{p}": r["l"],
+                        f"cl{p}": r["c"],
+                        f"v{p}": r["v"],
+                        f"a{p}": r["a"],
+                    })
+                s.execute(
+                    text(INSERT_SQL.format(values_clause=", ".join(placeholders))),
+                    params,
+                )
+            s.commit()
+
+        total_rows += len(insert_rows)
+
+    # Update trade calendar with new dates
+    with SyncSession() as s:
+        s.execute(text("""
+            INSERT INTO trade_calendar (trade_date, is_trade_day)
+            SELECT DISTINCT trade_date, true FROM stock_daily
+            ON CONFLICT (trade_date) DO NOTHING
+        """))
+        s.execute(text("""
+            UPDATE trade_calendar tc SET
+                pre_trade_date = (
+                    SELECT trade_date FROM trade_calendar
+                    WHERE trade_date < tc.trade_date ORDER BY trade_date DESC LIMIT 1
+                ),
+                next_trade_date = (
+                    SELECT trade_date FROM trade_calendar
+                    WHERE trade_date > tc.trade_date ORDER BY trade_date ASC LIMIT 1
+                )
+        """))
+        s.commit()
+
+    _set_progress(redis, "incremental", 100, f"Done: {total_rows} new rows")
+
+    logger.info(f"Incremental sync complete: {total_rows} new rows, {failed} failed")
+    return {
+        "status": "complete",
+        "new_rows": total_rows,
+        "failed": failed,
+    }
+
+
 @celery_app.task(bind=True, name="data_sync.full_init_sync")
 def full_init_sync(self, cookie: str = ""):
     """Full data sync: fetch all daily bars for all stocks using TickFlow.

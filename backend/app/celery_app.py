@@ -26,4 +26,10 @@ celery_app.conf.update(
     task_soft_time_limit=3300,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100,
+    beat_schedule={
+        "daily-incremental-sync": {
+            "task": "data_sync.incremental_sync",
+            "schedule": 3600.0,  # Every hour as fallback, but primarily triggered at market close
+        },
+    },
 )

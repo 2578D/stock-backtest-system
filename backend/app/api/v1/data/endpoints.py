@@ -204,6 +204,23 @@ async def trigger_full_sync(
     }
 
 
+@router.post("/sync/incremental")
+async def trigger_incremental_sync(
+    _current_user=Depends(get_current_user),
+):
+    """Trigger incremental sync for recent trading days."""
+    from app.celery_app import celery_app
+    task = celery_app.send_task(
+        "data_sync.incremental_sync",
+        kwargs={"lookback_days": 5},
+    )
+    return {
+        "code": 0,
+        "message": "Incremental sync started",
+        "data": {"task_id": task.id},
+    }
+
+
 @router.get("/sync/status")
 async def get_sync_status(
     _current_user=Depends(get_current_user),
