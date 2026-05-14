@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { useRoute } from "vue-router";
 import { backtestApi } from "@/api";
+import * as echarts from "echarts";
 
 const route = useRoute();
 const taskId = route.params.id as string;
@@ -10,6 +11,9 @@ const task = ref<any>({});
 const result = ref<any>({});
 const trades = ref<any[]>([]);
 const activeTab = ref("overview");
+
+const chartRef = ref<HTMLDivElement | null>(null);
+let chartInstance: echarts.ECharts | null = null;
 
 async function load() {
   loading.value = true;
@@ -23,6 +27,10 @@ async function load() {
     if (rRes.status === "fulfilled") result.value = rRes.value.data || {};
     if (trRes.status === "fulfilled") trades.value = trRes.value.data || [];
 
+    // Render chart after data arrives
+    await nextTick();
+    renderChart();
+
     // Auto-refresh if running
     if (task.value.status === "running" || task.value.status === "pending") {
       setTimeout(load, 3000);
@@ -31,6 +39,127 @@ async function load() {
     loading.value = false;
   }
 }
+
+function renderChart() {
+  if (!chartRef.value) return;
+  const eq = result.value.equity_curve;
+  if (!eq || typeof eq !== "object") return;
+
+  // equity_curve: { "2024-01-02": 1000123.45, ... }
+  const dates = Object.keys(eq).sort();
+  const navs = dates.map((d) => Number(eq[d]));
+  const initialCapital = task.value.initial_capital || 1000000;
+  const pcts = navs.map((v) => ((v - initialCapital) / initialCapital) * 100);
+
+  // Build daily return data
+  const dailyRets = result.value.daily_returns;
+  const retValues: number[] = [];
+  if (Array.isArray(dailyRets)) {
+    // daily_returns is array of floats, same length as dates
+    for (let i = 0; i < dates.length; i++) {
+      retValues.push(Number(dailyRets[i] || 0) * 100);
+    }
+  }
+
+  // Markdown region (max drawdown)
+  let drawdownStart = 0;
+  let drawdownEnd = 0;
+  let peak = navs[0];
+  let peakIdx = 0;
+  let maxDD = 0;
+  for (let i = 0; i < navs.length; i++) {
+    if (navs[i] > peak) { peak = navs[i]; peakIdx = i; }
+    const dd = (peak - navs[i]) / peak;
+    if (dd > maxDD) { maxDD = dd; drawdownStart = peakIdx; drawdownEnd = i; }
+  }
+  const markArea = maxDD > 0.01 ? {
+    data: [[{ xAxis: dates[drawdownStart] }, { xAxis: dates[drawdownEnd] }]],
+    itemStyle: { color: "rgba(245, 108, 108, 0.1)" },
+    label: { show: true, formatter: "最大回撤", position: "insideTop", color: "#f56c6c", fontSize: 11 },
+  } : undefined;
+
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value);
+  }
+
+  chartInstance.setOption({
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "cross" },
+      formatter(params: any) {
+        const d = params[0]?.axisValue || "";
+        const navItem = params.find((p: any) => p.seriesName === "资金曲线");
+        const retItem = params.find((p: any) => p.seriesName === "日收益率");
+        return `${d}<br/>${navItem ? `净值: ¥${Number(navItem.value).toLocaleString()}` : ""}${
+          navItem ? ` (${navItem.data.pct?.toFixed(2)}%)` : ""
+        }${retItem ? `<br/>日收益: ${retItem.value.toFixed(2)}%` : ""}`;
+      },
+    },
+    legend: {
+      data: ["资金曲线", "日收益率"],
+      top: 0,
+    },
+    grid: { top: 40, left: 70, right: 70, bottom: 40 },
+    xAxis: {
+      type: "category",
+      data: dates,
+      axisLabel: { formatter: (v: string) => v.slice(5) },
+    },
+    yAxis: [
+      {
+        type: "value",
+        name: "净值 (¥)",
+        axisLabel: { formatter: (v: number) => (v / 10000).toFixed(0) + "万" },
+        splitLine: { lineStyle: { type: "dashed" } },
+      },
+      {
+        type: "value",
+        name: "日收益率 (%)",
+        axisLabel: { formatter: "{value}%" },
+        splitLine: { show: false },
+      },
+    ],
+    dataZoom: [
+      { type: "inside", start: 0, end: 100 },
+      { type: "slider", bottom: 0, height: 20 },
+    ],
+    series: [
+      {
+        name: "资金曲线",
+        type: "line",
+        data: navs.map((v, i) => ({ value: v, pct: pcts[i] })),
+        smooth: true,
+        showSymbol: false,
+        lineStyle: { color: "#409eff", width: 2 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(64,158,255,0.3)" },
+            { offset: 1, color: "rgba(64,158,255,0.05)" },
+          ]),
+        },
+        markArea: markArea,
+      },
+      ...(retValues.length > 0 ? [{
+        name: "日收益率",
+        type: "bar",
+        yAxisIndex: 1,
+        data: retValues.map((v) => {
+          const color = v >= 0 ? "#e8590c33" : "#52c41a33";
+          const border = v >= 0 ? "#e8590c" : "#52c41a";
+          return { value: v, itemStyle: { color, borderColor: border, borderWidth: 1 } };
+        }),
+      }] : []),
+    ],
+  }, true);
+}
+
+// Watch for tab changes to resize chart
+watch(activeTab, async (tab) => {
+  if (tab === "overview") {
+    await nextTick();
+    chartInstance?.resize();
+  }
+});
 
 function fmtPct(v: number | null | undefined) {
   if (v == null) return "-";
@@ -50,6 +179,7 @@ function statusLabel(s: string) {
 }
 
 onMounted(load);
+onUnmounted(() => { chartInstance?.dispose(); });
 </script>
 
 <template>
@@ -103,6 +233,11 @@ onMounted(load);
             <el-card><el-statistic title="超额收益"><template #default>{{ fmtPct(result.excess_return) }}</template></el-statistic></el-card>
           </el-col>
         </el-row>
+
+        <!-- Equity curve chart -->
+        <el-card style="margin-top: 16px" v-if="result.equity_curve">
+          <div ref="chartRef" style="width: 100%; height: 400px"></div>
+        </el-card>
       </el-tab-pane>
 
       <!-- Risk -->
@@ -135,7 +270,7 @@ onMounted(load);
           <el-table-column prop="hold_days" label="持有天数" width="90" />
           <el-table-column prop="return_rate" label="收益率" width="90">
             <template #default="{ row }">
-              <span :style="{ color: row.return_rate >= 0 ? '#67c23a' : '#f56c6c' }">
+              <span :style="{ color: row.return_rate >= 0 ? '#e8590c' : '#52c41a' }">
                 {{ row.return_rate != null ? (row.return_rate * 100).toFixed(2) + '%' : '-' }}
               </span>
             </template>

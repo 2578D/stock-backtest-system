@@ -166,8 +166,8 @@ async def get_backtest_result(task_id: str, db: AsyncSession = Depends(get_db)):
             "avg_hold_days": float(row[13]) if row[13] else None,
             "max_single_profit": float(row[14]) if row[14] else None,
             "max_single_loss": float(row[15]) if row[15] else None,
-            "equity_curve": row[16],
-            "daily_returns": row[17],
+            "equity_curve": row[16] if isinstance(row[16], dict) else (json.loads(row[16]) if row[16] else {}),
+            "daily_returns": row[17] if isinstance(row[17], list) else (json.loads(row[17]) if row[17] else []),
         },
     }
 
