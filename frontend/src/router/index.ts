@@ -69,6 +69,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "策略选股器", icon: "Filter" },
       },
       {
+        path: "factors",
+        name: "FactorAnalysis",
+        component: () => import("@/views/FactorAnalysisView.vue"),
+        meta: { title: "因子研究", icon: "DataLine" },
+      },
+      {
         path: "backtests",
         children: [
           {

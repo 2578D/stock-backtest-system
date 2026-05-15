@@ -13,6 +13,7 @@ const menuItems = computed(() => [
   { path: "/strategies", title: "策略中心", icon: "Opportunity" },
   { path: "/picker", title: "选股器", icon: "Filter" },
   { path: "/signals", title: "每日信号", icon: "AlarmClock" },
+  { path: "/factors", title: "因子研究", icon: "DataLine" },
   { path: "/backtests", title: "回测中心", icon: "DataAnalysis" },
   { path: "/settings", title: "系统设置", icon: "Tools" },
 ]);

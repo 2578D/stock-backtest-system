@@ -92,6 +92,23 @@ export const pickerApi = {
     return http.post("/picks/run", data);
   },
 };
+export const factorApi = {
+  list(params?: { category?: string }) {
+    return http.get("/factors", { params });
+  },
+  get(id: string) {
+    return http.get(`/factors/${id}`);
+  },
+  analyze(id: string, data: { start_date: string; end_date: string; group_count?: number; forward_days?: number }) {
+    return http.post(`/factors/${id}/analyze`, data);
+  },
+  listAnalyses(id: string, params?: { status?: string }) {
+    return http.get(`/factors/${id}/analysis`, { params });
+  },
+  getAnalysis(factorId: string, analysisId: string) {
+    return http.get(`/factors/${factorId}/analysis/${analysisId}`);
+  },
+};
 
 export const systemApi = {
   getProfile() {
