@@ -246,13 +246,6 @@ stock-backtest-system/
 └── sync_tickflow.py            # TickFlow 同步脚本
 ```
 
-## API 文档
-
-启动后端服务后，访问以下地址查看自动生成的 API 文档：
-
-- Swagger UI: `http://localhost/docs`（仅开发模式）
-- ReDoc: `http://localhost/redoc`（仅开发模式）
-
 ## 贡献指南
 
 欢迎提交 Issue 和 Pull Request！
@@ -502,13 +495,6 @@ stock-backtest-system/
 ├── sync_now.py                 # Manual data sync trigger
 └── sync_tickflow.py            # TickFlow sync script
 ```
-
-## API Documentation
-
-After starting the backend server, visit these URLs for auto-generated API docs:
-
-- Swagger UI: `http://localhost/docs` (development mode only)
-- ReDoc: `http://localhost/redoc` (development mode only)
 
 ## Contributing
 
